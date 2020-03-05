@@ -1,0 +1,16 @@
+cycle=5 decision=rationale
+T1 u=3  
+T2 u=4
+TIK
+A u=1
+TIK
+T3 u=3
+A u=2
+TIK
+T4 u=2
+A u=1
+TIK
+A u=4
+TIK
+A u=3
+end

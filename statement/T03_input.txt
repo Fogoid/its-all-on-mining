@@ -1,0 +1,7 @@
+cycle=2 decision=rationale memory-factor=0.3
+T1 u=2
+TIK
+A u=1
+TIK
+A u=3
+end

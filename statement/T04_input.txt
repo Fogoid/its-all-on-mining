@@ -1,0 +1,10 @@
+cycle=3 decision=flexible
+T1 u=1  
+T2 u=4
+TIK
+A u=11
+TIK
+A u=-1
+TIK
+A u={T1=3,T2=2}
+end

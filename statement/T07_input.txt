@@ -1,0 +1,12 @@
+cycle=2 agents={A1,A2,A3} decision=heterogeneous-society restart=0 concurrency-penalty=2
+T1 u=3  
+T2 u=2  
+TIK
+A1 u=5
+A2 u=3
+A3 u=0
+TIK
+A1 u=3
+A2 u=2
+A3 u=2
+end

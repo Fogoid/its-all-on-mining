@@ -1,0 +1,15 @@
+cycle=5 decision=flexible restart=0 memory-factor=0.0
+T0 u=6
+T1 u=5
+TIK
+A u=12
+T2 u=4
+TIK
+A u=-2
+TIK
+A u={T0=2,T1=2}
+TIK
+A u={T0=-1,T2=3}
+TIK
+A u=1
+end

@@ -1,0 +1,13 @@
+cycle=5 decision=rationale restart=1
+T1 u=3  
+T2 u=4
+TIK
+TIK
+A u=1
+TIK
+TIK
+T3 u=3
+A u=1
+TIK
+A u=1
+end
