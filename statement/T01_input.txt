@@ -1,4 +1,4 @@
-cycle=5 decision=rationale
+cycle=5 decision=rationale  
 T1 u=3  
 T2 u=4
 TIK
