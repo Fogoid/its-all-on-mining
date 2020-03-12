@@ -13,8 +13,9 @@ class Observation:
 
 class Agent:
     def __init__(self, options):
+
         # Regex to decide which type of configurations there are
-        self.cycle = int(re.search(r"cycle=\w+( |\n|\r\n)", options).group(0)[len("cycle="):])
+        self.cycle = int(re.search(r"cycle=\d+( |\n|\r\n)", options).group(0)[len("cycle="):])
         self.decision = re.search(r"decision=[\w-]+( |\n|\r\n)", options).group(0)[len("decision="):].strip(" \r\n")
         
         restart = re.search(r"restart=\d+( |\n||\r\n)", options)
@@ -23,8 +24,8 @@ class Agent:
         memoryFactor = re.search(r"memory-factor=\d+\.\d+( |\n|\r\n)", options)
         self.memoryFactor = 0.0 if memoryFactor is None else float(memoryFactor.group(0)[len("memory-factor="):].strip(" \r\n"))
         
-        agents = re.search(r"agents=\[\w\d(,\w\d)*\]( |\n|\r\n)", options)
-        self.agents = None if agents is None else agents.group(0)[len("agents="):].strip(" \r\n")
+        agents = re.search(r"agents=[\[\{]\w\d(,\w\d)*[\}\]]( |\n|\r\n)", options)
+        self.agents = ["A"] if agents is None else agents.group(0)[len("agents="):].strip("}}][{{ \r\n").split(",")
 
         # Dictionary where the expected utilities of each task observed is kept
         self.tasks = {}
@@ -47,7 +48,11 @@ class Agent:
             self.tasks[int(perception[0][1:])] = [float(perception[1][len("u="):]), self.restart]
         
         else: # It is an observation
-            utiObserved = float(perception[len("A u="):])
+            utiObserved = 0
+            if "A " in perception:
+                utiObserved = float(perception[len("A u="):])
+            else:
+                utiObserved = float(perception[len("Ax u="):])
 
             taskObs = self.expectedObsTasks.get()
 
@@ -88,7 +93,8 @@ class Agent:
             self.preparing = toExecute
             
         if self.tasks[self.preparing][1] == 0:
-            self.expectedObsTasks.put(self.preparing)
+            for _ in self.agents:
+                self.expectedObsTasks.put(self.preparing)
             
         self.tasks[self.preparing][1] -= (1 if self.tasks[self.preparing][1] > 0 else 0)
         
@@ -96,8 +102,16 @@ class Agent:
 
     def recharge(self):
         output = "state={"
-        for i in self.tasks.keys():
-            output += 'T%d=' % (i) + (('%.2f,' % (self.tasks[i][0])) if i in self.observations.keys() else "NA,")
+        
+        if len(self.agents) == 1:
+            for i in self.tasks.keys():
+                output += 'T%d=' % (i) + (('%.2f,' % (self.tasks[i][0])) if i in self.observations.keys() else "NA,")
+        else:
+            for a in self.agents:
+                output += a + "={"
+                for i in self.tasks.keys():
+                    output += 'T%d=' % (i) + (('%.2f,' % (self.tasks[i][0])) if i in self.observations.keys() else "NA,")
+                output = output[:-1] + "},"
 
         return output[:-1] + '} gain=%.2f' % (self.gain)
 
