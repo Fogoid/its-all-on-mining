@@ -7,7 +7,7 @@ with open("TestResults.txt", "w") as myfile:
 		myfile.write("CASES:\n")
 
 i = 0
-while i < len(files) - 12: # REMOVE THE 12 LATER WHEN IMPLEMENTED THE HETEROGENEUS
+while i < len(files):
 
 	string = "compare-object (cat .\\cases\\{}) (cat .\\cases\\{} | C:\\DevTools\\Python\\Python35\\python exercise.py)".format(files[i+1], files[i])
 	process = subprocess.Popen(["powershell", string], stdout=subprocess.PIPE)
