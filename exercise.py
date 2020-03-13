@@ -67,6 +67,8 @@ class Agent:
             self.tasks[taskObs][0] = eu
             self.gain += utiObserved
 
+            return utiObserved
+
     def decide_act(self):
         best_utility = -1
 
@@ -80,7 +82,7 @@ class Agent:
         # TO MAKE SURE BECAUSE OF THE CASE WITH TASKS HAVING ONLY NEGATIVE UTILITIES
         if toExecute == -1:
             self.currentStep += 1
-            return
+            return -1, -1
 
         if toExecute != self.preparing:
             if self.preparing != -1:
@@ -143,7 +145,7 @@ class MultiAgent:
                 self.agents[p[0]].expectedObsTasks.get()
                 self.addObservation(task, float(p[1][len("u="):]))
             else: #JUST GIVE TO THE CORRESPONDANT AGENT
-                self.agents[p[0]].perceive(perception)
+                self.gain += self.agents[p[0]].perceive(perception)
 
     def decide_act(self):
         for a in self.agentsNames:
