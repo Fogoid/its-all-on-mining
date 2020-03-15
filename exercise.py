@@ -6,6 +6,12 @@ import queue
 ### A: AGENT BEHAVIOR ###
 #########################
 
+def roundNumber(num):
+    m = (num * 1000) % 10
+    if m >= 5:
+        num += (10 - m) / 1000
+    return num
+
 class Observation:
     def __init__(self, utility, step):
         self.utility = utility
@@ -43,47 +49,67 @@ class Agent:
 
     def perceive(self, perception):
         p = perception.split(' ')
-        if ("T" in  perception):
-            self.tasks[int(p[0][1:])] = [float(p[1][len("u="):]), self.restart]
+        if "A" not in perception:
+            newTask = [float(p[1][len("u="):]), self.restart]
+            if self.decision == "flexible":
+                newTask += [float(p[1][len("u="):])]
+            self.tasks[int(p[0][1:])] = newTask
         
         else: # It is an observation
-            utiObserved = float(p[1][len("u="):])
-
-            taskObs = self.expectedObsTasks.get()
-
-            if taskObs in self.observations.keys():
-                self.observations[taskObs] += [Observation(utiObserved, self.currentStep)]
+            observations = []
+            if self.decision == "flexible" and "," in p[1]:
+                observations = self.multiple_observations(p[1])
             else:
-                self.observations[taskObs] = [Observation(utiObserved, self.currentStep)]
-            
-            # Calculate the new Expected Utility for the task
-            eu = 0
-            stepSums = 0
-            for obs in self.observations[taskObs]:
-                eu += (obs.step ** self.memoryFactor) * obs.utility
-                stepSums += obs.step ** self.memoryFactor
-            eu /= stepSums
+                utiObserved = float(p[1][len("u="):])
+                taskObs = self.expectedObsTasks.get()
+                observations += [(taskObs, utiObserved, 1)]
 
-            self.tasks[taskObs][0] = eu
-            self.gain += utiObserved
+            for taskObs, utiObserved, percentage in observations:
+                if self.decision == "flexible" and self.tasks[taskObs][2] > utiObserved:
+                    self.tasks[taskObs][2] = utiObserved
+
+                if taskObs in self.observations.keys():
+                    self.observations[taskObs] += [Observation(utiObserved, self.currentStep)]
+                else:
+                    self.observations[taskObs] = [Observation(utiObserved, self.currentStep)]
+                
+                # Calculate the new Expected Utility for the task
+                eu = 0
+                stepSums = 0
+                for obs in self.observations[taskObs]:
+                    eu += (obs.step ** self.memoryFactor) * obs.utility
+                    stepSums += obs.step ** self.memoryFactor
+                eu /= stepSums
+
+                self.tasks[taskObs][0] = eu
+                self.gain += utiObserved * percentage
 
             return utiObserved
 
     def decide_act(self):
         best_utility = -1
+        secondBest = -1
 
         toExecute = -1
         for i in self.tasks.keys():
             meu = self.tasks[i][0] * (self.cycle - (self.currentStep + self.tasks[i][1]))
-            if (meu > best_utility):
+            better_one = False if toExecute == -1 else self.decision == "flexible" and self.tasks[i][2] < 0 and self.tasks[i][2] > self.tasks[toExecute][2] and meu > secondBest
+            if (meu > best_utility or better_one):
                 best_utility = meu
                 toExecute = i
-        
-        # TO MAKE SURE BECAUSE OF THE CASE WITH TASKS HAVING ONLY NEGATIVE UTILITIES
+
+            if (meu > secondBest and meu < best_utility):
+                secondBest = meu
+
         if toExecute == -1:
             self.currentStep += 1
             return -1, -1
 
+        #Choose another decision with this one and dedicate a percentage to it
+        if self.decision == "flexible" and self.tasks[toExecute][2] < 0:
+            return self.multiple_tasks(toExecute)
+
+        #Normal execution when there is no flexible agents
         if toExecute != self.preparing:
             if self.preparing != -1:
                 self.tasks[self.preparing][1] = self.restart
@@ -106,6 +132,38 @@ class Agent:
             output += 'T%d=' % (i) + (('%.2f,' % (self.tasks[i][0])) if i in self.observations.keys() else "NA,")
 
         return output[:-1] + '} gain=%.2f' % (self.gain)
+
+    def multiple_tasks(self, firstTask):
+        best_utility = -1
+
+        toExecute = -1
+        for i in self.tasks.keys():
+            if i == firstTask or self.tasks[i][2] <= 0:
+                continue
+            meu = self.tasks[i][0] * (self.cycle - (self.currentStep + self.tasks[i][1]))
+            if (meu > best_utility):
+                best_utility = meu
+                toExecute = i
+
+        total = self.tasks[toExecute][0] - self.tasks[firstTask][2]
+        firstPer = self.tasks[toExecute][0] / total
+        secondPer = - self.tasks[firstTask][2] / total
+        execOrder = [(firstTask, firstPer),(toExecute, secondPer)]
+        execOrder.sort(key=lambda x: x[0])
+        self.expectedObsTasks.put(execOrder)
+
+        execOrder = [(firstTask, roundNumber(firstPer)),(toExecute, 1 - roundNumber(firstPer))]
+        execOrder.sort(key=lambda x: x[0])
+        sys.stdout.write("{{T{}={:.2f},T{}={:.2f}}}\n".format(execOrder[0][0], execOrder[0][1], execOrder[1][0], execOrder[1][1]))
+
+        self.currentStep += 1
+
+    def multiple_observations(self, perception):
+        [(firstTask, fper), (secondTask, sper)] = self.expectedObsTasks.get()
+
+        [fObs,sObs] = re.sub(r"T\d+=", "", perception[3:-2]).split(",")
+
+        return [(firstTask, float(fObs), fper), (secondTask, float(sObs), sper)]
 
 class MultiAgent:
 
@@ -143,7 +201,7 @@ class MultiAgent:
             task = self.expectedObsTasks.get()
             if self.decision == "homogeneous-society": #GIVE THE OBSERVATION TO ALL THE AGENTS
                 self.agents[p[0]].expectedObsTasks.get()
-                self.addObservation(task, float(p[1][len("u="):]))
+                self.add_observation(task, float(p[1][len("u="):]))
             else: #JUST GIVE TO THE CORRESPONDANT AGENT
                 self.gain += self.agents[p[0]].perceive(perception)
 
@@ -155,7 +213,7 @@ class MultiAgent:
         
         self.currentStep += 1
 
-    def addObservation(self, task, observation):
+    def add_observation(self, task, observation):
         if task in self.observations.keys():
             self.observations[task] += [Observation(observation, self.currentStep)]
         else:
