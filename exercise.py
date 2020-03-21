@@ -18,6 +18,7 @@ class Observation:
         self.step = step
 
 class Agent:
+    
     def __init__(self, options):
         # Regex to decide which type of configurations there are
         self.cycle = int(re.search(r"cycle=\d+( |\n|\r\n)", options).group(0)[len("cycle="):])
@@ -169,15 +170,21 @@ class MultiAgent:
 
     def __init__(self, options):
         self.decision = re.search(r"decision=[\w-]+( |\n|\r\n)", options).group(0)[len("decision="):].strip(" \r\n")
-        
+        self.cycle = int(re.search(r"cycle=\d+( |\n|\r\n)", options).group(0)[len("cycle="):])
+
         restart = re.search(r"restart=\d+( |\n||\r\n)", options)
         self.restart = 0 if restart is None else int(restart.group(0)[len("restart="):].strip(" \r\n"))
         
         memoryFactor = re.search(r"memory-factor=\d+\.\d+( |\n|\r\n)", options)
         self.memoryFactor = 0.0 if memoryFactor is None else float(memoryFactor.group(0)[len("memory-factor="):].strip(" \r\n"))
 
+        concurrencyPenalty = re.search(r"concurrency-penalty=\d+( |\n|\r\n)", options)
+        self.concurrencyPenalty = 0 if concurrencyPenalty is None else int(concurrencyPenalty.group(0)[len("concurrency-penalty="):].strip(" \r\n"))
+
         self.currentStep = 0
         self.gain = 0.0
+
+        self.numberOftasks = 0
         
         agents = re.search(r"agents=[\[\{]\w\d(,\w\d)*[\}\]]( |\n|\r\n)", options)
         self.agentsNames = agents.group(0)[len("agents="):].strip("}}][{{ \r\n").split(",")
@@ -197,6 +204,7 @@ class MultiAgent:
         if ("T" in perception): #GIVE THE NEW TASK TO ALL THE AGENTS
             for a in self.agentsNames:
                 self.agents[a].tasks[int(p[0][1:])] = [float(p[1][len("u="):]), self.restart]
+                self.numberOftasks += 1
         else:
             task = self.expectedObsTasks.get()
             if self.decision == "homogeneous-society": #GIVE THE OBSERVATION TO ALL THE AGENTS
@@ -204,14 +212,6 @@ class MultiAgent:
                 self.add_observation(task, float(p[1][len("u="):]))
             else: #JUST GIVE TO THE CORRESPONDANT AGENT
                 self.gain += self.agents[p[0]].perceive(perception)
-
-    def decide_act(self):
-        for a in self.agentsNames:
-            task, timeToExecute = self.agents[a].decide_act()
-            if timeToExecute == 0:
-                self.expectedObsTasks.put(task) # add to queue of observations
-        
-        self.currentStep += 1
 
     def add_observation(self, task, observation):
         if task in self.observations.keys():
@@ -230,6 +230,77 @@ class MultiAgent:
         for a in self.agents:
             self.agents[a].tasks[task][0] = eu
         self.gain += observation
+
+    def decide_act(self):
+        numberOfAgents = len(self.agentsNames)
+        allTasks = [None]*numberOfAgents
+        for i in range(numberOfAgents):
+            newValue = ()
+            for k, v in self.agents[self.agentsNames[i]].tasks.items():
+                newValue += ([k,] + v,)
+            allTasks[i] = newValue
+
+        firstValues = list((x,) for x in allTasks[0])
+
+        permutations = self.get_permutations(allTasks[1:], firstValues)
+        bestCombination = self.get_best_combination(permutations)
+
+        for i in range(numberOfAgents):
+            self.agents[self.agentsNames[i]].currentStep += 1
+            
+            if (bestCombination[i][1] <= 0):
+                continue
+
+            if self.agents[self.agentsNames[i]].preparing != bestCombination[i][0]:
+                lastPrepared = self.agents[self.agentsNames[i]].preparing
+                if lastPrepared != -1:
+                    self.agents[self.agentsNames[i]].tasks[lastPrepared][1] = self.restart
+                self.agents[self.agentsNames[i]].preparing = bestCombination[i][0]
+
+            if bestCombination[i][2] == 0:
+                self.expectedObsTasks.put(bestCombination[i][0])
+                self.agents[self.agentsNames[i]].expectedObsTasks.put(bestCombination[i][0])
+            else:
+                self.agents[self.agentsNames[i]].tasks[bestCombination[i][0]][1] -= 1
+            
+        self.currentStep += 1
+    
+    def get_permutations(self, allTasks, permutations_made):
+        newPermutations = []
+        for i in permutations_made:
+            for j in allTasks[0]:
+                newPermutations += [i + (j,),]
+                
+        if allTasks[1:] == []:
+            return newPermutations
+        else:
+            return self.get_permutations(allTasks[1:], newPermutations)
+        
+    def get_best_combination(self, permutations):
+        bestCombination = ()
+        bestGain = -1
+        for p in permutations:
+            tasksChosen = {}
+            gain = 0
+            biggerRestart = {}
+            for [task, eu, restart] in p:
+                if eu > 0:
+                    gain += eu * (self.cycle - self.currentStep - restart)
+                    if task in tasksChosen.keys():
+                        tasksChosen[task] = tasksChosen[task] + 1
+                        if restart > biggerRestart[task]:
+                            biggerRestart[task] = restart
+                    else:
+                        tasksChosen[task] = 1
+                        biggerRestart[task] = restart
+
+            for v in tasksChosen.values():
+                gain -= 0 if v == 1 else self.concurrencyPenalty * v * (self.cycle - self.currentStep - restart)
+            if gain > bestGain:
+                bestGain = gain
+                bestCombination = p
+
+        return bestCombination
 
     def recharge(self):
         output = "state={"
