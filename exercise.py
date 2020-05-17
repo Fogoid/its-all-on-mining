@@ -146,7 +146,7 @@ class Agent:
                 best_utility = meu
                 toExecute = i
 
-        total = self.tasks[toExecute][0] - self.tasks[firstTask][2]
+        total = self.tasks[toExecute][2] - self.tasks[firstTask][2]
         firstPer = self.tasks[toExecute][0] / total
         secondPer = - self.tasks[firstTask][2] / total
         execOrder = [(firstTask, firstPer),(toExecute, secondPer)]

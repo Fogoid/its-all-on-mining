@@ -1,0 +1,37 @@
+CASES:
+T00_input.txt: PASSED
+T01_input.txt: PASSED
+T02_input.txt: PASSED
+T03_input.txt: PASSED
+T04_input.txt: PASSED
+T05_input.txt: PASSED
+T06_input.txt: PASSED
+T07_input.txt: PASSED
+T08a_input.txt: PASSED
+T08b_input.txt: FAILED
+T08c_input.txt: FAILED
+T09_input.txt: PASSED
+T10_input.txt: PASSED
+T11_input.txt: PASSED
+T12a_input.txt: FAILED
+T12b_input.txt: PASSED
+T13_input.txt: PASSED
+T14_input.txt: PASSED
+T15_input.txt: PASSED
+T16_input.txt: PASSED
+T17a_input.txt: PASSED
+T17b_input.txt: FAILED
+T18_input.txt: PASSED
+T19a_input.txt: FAILED
+T19b_alternative_input.txt: PASSED
+T20_input.txt: PASSED
+
+STATEMENT:
+
+T01_input.txt: PASSED
+T02_input.txt: PASSED
+T03_input.txt: PASSED
+T04_input.txt: FAILED
+T05_input.txt: PASSED
+T06_input.txt: PASSED
+T07_input.txt: PASSED
